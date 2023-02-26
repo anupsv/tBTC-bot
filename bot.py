@@ -2,6 +2,8 @@ import json
 import os
 import re
 import logging
+from datetime import datetime
+
 import discord
 from dotenv import load_dotenv
 import requests
@@ -12,7 +14,8 @@ load_dotenv()
 DISCORDTOKEN = os.getenv('DISCORD_TOKEN')
 ETHERSCAN_TOKEN = os.getenv('ETHERSCAN_TOKEN')
 CONTRACT = os.getenv('CONTRACT')
-TOPIC0 = os.getenv('TOPIC0')
+PROPOSAL_CREATED_TOPIC = os.getenv('PROPOSAL_CREATED_TOPIC')
+PROPOSAL_QUEUED_TOPIC = os.getenv('PROPOSAL_QUEUED_TOPIC')
 DISCORD_CHANNEL = int(os.getenv('DISCORD_CHANNEL'))
 
 intents = discord.Intents.default()
@@ -28,13 +31,14 @@ logger = logging.getLogger('tbtc-dao-monitoring')
 async def on_ready():
     logger.info("{} connected to Discord!".format(client.user))
     monitor_tbtc_dao_contract.start()
+    monitor_tbtc_proposal_queued_events.start()
 
 
 @tasks.loop(seconds=30)
 async def monitor_tbtc_dao_contract():
-    start_block = int(os.getenv('START_BLOCK'))
+    start_block = int(os.getenv('START_BLOCK_CREATE_TOPIC'))
     payload = (('module', 'logs'), ('action', 'getLogs'), ('address', CONTRACT), ('fromBlock', start_block),
-               ('page', '1'), ('offset', '1000'), ('apikey', ETHERSCAN_TOKEN), ('topic0', TOPIC0))
+               ('page', '1'), ('offset', '1000'), ('apikey', ETHERSCAN_TOKEN), ('topic0', PROPOSAL_CREATED_TOPIC))
     response = requests.get("https://api.etherscan.io/api", params=payload)
 
     if response.status_code != 200:
@@ -46,10 +50,10 @@ async def monitor_tbtc_dao_contract():
         for each in json.loads(response.content)["result"]:
             all_data_in_bytes = bytes.fromhex(each["data"][2:])
             transaction_hash = each["transactionHash"]
-            if int(os.getenv("START_BLOCK")) < int(each["blockNumber"], 16):
-                logger.info("start block updated from {} to {}".format(os.getenv("START_BLOCK"),
+            if int(os.getenv("START_BLOCK_CREATE_TOPIC")) < int(each["blockNumber"], 16):
+                logger.info("start block updated from {} to {}".format(os.getenv("START_BLOCK_CREATE_TOPIC"),
                                                                        int(each["blockNumber"], 16)))
-                os.environ["START_BLOCK"] = str(int(each["blockNumber"], 16))
+                os.environ["START_BLOCK_CREATE_TOPIC"] = str(int(each["blockNumber"], 16))
             else:
                 continue
 
@@ -80,6 +84,93 @@ async def monitor_tbtc_dao_contract():
                        "https://etherscan.io/block/{}".format(int(each["blockNumber"], 16)),
                        "https://etherscan.io/tx/{}".format(transaction_hash),
                        description)
+            channel = client.get_channel(DISCORD_CHANNEL)
+            logger.debug("sent following message to channel")
+            logger.debug(embed.description)
+            await channel.send(embed=embed)
+
+
+@tasks.loop(seconds=30)
+async def monitor_tbtc_proposal_queued_events():
+    start_block = int(os.getenv('START_BLOCK_QUEUED_TOPIC'))
+    payload = (('module', 'logs'), ('action', 'getLogs'), ('address', CONTRACT), ('fromBlock', start_block),
+               ('page', '1'), ('offset', '1000'), ('apikey', ETHERSCAN_TOKEN), ('topic0', PROPOSAL_QUEUED_TOPIC))
+    response = requests.get("https://api.etherscan.io/api", params=payload)
+
+    if response.status_code != 200:
+        logger.error("Couldn't get logs from etherscan... trying after 30 seconds.")
+        logger.error(response.content)
+
+    else:
+        logger.info("got the data from etherscan successfully.")
+        for each in json.loads(response.content)["result"]:
+            all_data_in_bytes = bytes.fromhex(each["data"][2:])
+            transaction_hash = each["transactionHash"]
+            if int(os.getenv("START_BLOCK_QUEUED_TOPIC")) < int(each["blockNumber"], 16):
+                logger.info("start block updated from {} to {}".format(os.getenv("START_BLOCK_QUEUED_TOPIC"),
+                                                                       int(each["blockNumber"], 16)))
+                os.environ["START_BLOCK_QUEUED_TOPIC"] = str(int(each["blockNumber"], 16))
+            else:
+                continue
+
+            decoded_ABI = abi.decode(['uint256', "uint256"], all_data_in_bytes)
+
+            proposal_id = decoded_ABI[0]
+            eta = decoded_ABI[1]
+            embed = discord.Embed()
+            embed.description = "Proposal with the below ID is now being considered by the DAO and " \
+                                "estimated completion time is {}\n\n" \
+                                "**Proposal Id:** {}\n" \
+                                "**Block Number:** {}\n" \
+                                "**TX Hash:** [here]({})\n".format(
+                datetime.utcfromtimestamp(eta).strftime('%Y-%m-%d %H:%M:%S'),
+                proposal_id,
+                "https://etherscan.io/block/{}".format(int(each["blockNumber"], 16)),
+                "https://etherscan.io/tx/{}".format(transaction_hash),
+            )
+            channel = client.get_channel(DISCORD_CHANNEL)
+            logger.debug("sent following message to channel")
+            logger.debug(embed.description)
+            await channel.send(embed=embed)
+
+@tasks.loop(seconds=30)
+async def monitor_tbtc_proposal_queued_events():
+    start_block = int(os.getenv('START_BLOCK_QUEUED_TOPIC'))
+    payload = (('module', 'logs'), ('action', 'getLogs'), ('address', CONTRACT), ('fromBlock', start_block),
+               ('page', '1'), ('offset', '1000'), ('apikey', ETHERSCAN_TOKEN), ('topic0', PROPOSAL_QUEUED_TOPIC))
+    response = requests.get("https://api.etherscan.io/api", params=payload)
+
+    if response.status_code != 200:
+        logger.error("Couldn't get logs from etherscan... trying after 30 seconds.")
+        logger.error(response.content)
+
+    else:
+        logger.info("got the data from etherscan successfully.")
+        for each in json.loads(response.content)["result"]:
+            all_data_in_bytes = bytes.fromhex(each["data"][2:])
+            transaction_hash = each["transactionHash"]
+            if int(os.getenv("START_BLOCK_QUEUED_TOPIC")) < int(each["blockNumber"], 16):
+                logger.info("start block updated from {} to {}".format(os.getenv("START_BLOCK_QUEUED_TOPIC"),
+                                                                       int(each["blockNumber"], 16)))
+                os.environ["START_BLOCK_QUEUED_TOPIC"] = str(int(each["blockNumber"], 16))
+            else:
+                continue
+
+            decoded_ABI = abi.decode(['uint256', "uint256"], all_data_in_bytes)
+
+            proposal_id = decoded_ABI[0]
+            eta = decoded_ABI[1]
+            embed = discord.Embed()
+            embed.description = "Proposal with the below ID is now being considered by the DAO and " \
+                                "estimated completion time is {}\n\n" \
+                                "**Proposal Id:** {}\n" \
+                                "**Block Number:** {}\n" \
+                                "**TX Hash:** [here]({})\n".format(
+                datetime.utcfromtimestamp(eta).strftime('%Y-%m-%d %H:%M:%S'),
+                proposal_id,
+                "https://etherscan.io/block/{}".format(int(each["blockNumber"], 16)),
+                "https://etherscan.io/tx/{}".format(transaction_hash),
+            )
             channel = client.get_channel(DISCORD_CHANNEL)
             logger.debug("sent following message to channel")
             logger.debug(embed.description)
