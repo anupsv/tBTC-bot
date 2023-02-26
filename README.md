@@ -29,3 +29,4 @@ INFO:tbtc-dao-monitoring:got the data from etherscan successfully.
 ```
 
 #### Example alerts
+![recent proposal alerts](docs/example-alerts-in-channel.png)

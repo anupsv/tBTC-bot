@@ -21,7 +21,8 @@ intents.presences = False
 client = discord.Client(intents=intents)
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
-logger = logging.getLogger('tBTC DAO Monitoring')
+logger = logging.getLogger('tbtc-dao-monitoring')
+
 
 @client.event
 async def on_ready():
@@ -32,9 +33,9 @@ async def on_ready():
 @tasks.loop(seconds=30)
 async def monitor_tbtc_dao_contract():
     start_block = int(os.getenv('START_BLOCK'))
-    response = requests.get(
-        "https://api.etherscan.io/api?module=logs&action=getLogs&address={}&fromBlock={}&page=1&offset=500&apikey={}&topic0={}".format(
-            CONTRACT, start_block, ETHERSCAN_TOKEN,TOPIC0))
+    payload = (('module', 'logs'), ('action', 'getLogs'), ('address', CONTRACT), ('fromBlock', start_block),
+               ('page', '1'), ('offset', '1000'), ('apikey', ETHERSCAN_TOKEN), ('topic0', TOPIC0))
+    response = requests.get("https://api.etherscan.io/api", params=payload)
 
     if response.status_code != 200:
         logger.error("Couldn't get logs from etherscan... trying after 30 seconds.")
@@ -47,7 +48,7 @@ async def monitor_tbtc_dao_contract():
             transaction_hash = each["transactionHash"]
             if int(os.getenv("START_BLOCK")) < int(each["blockNumber"], 16):
                 logger.info("start block updated from {} to {}".format(os.getenv("START_BLOCK"),
-                                                                 int(each["blockNumber"], 16)))
+                                                                       int(each["blockNumber"], 16)))
                 os.environ["START_BLOCK"] = str(int(each["blockNumber"], 16))
             else:
                 continue
