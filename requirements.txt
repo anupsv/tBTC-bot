@@ -1,0 +1,6 @@
+discord.py
+python-dotenv
+discord
+asyncio
+requests
+eth_abi
