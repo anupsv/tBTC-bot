@@ -28,6 +28,42 @@ logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger('tbtc-dao-monitoring')
 
 
+@tasks.loop(minutes=30)
+def handle_redemption_requested_event(event):
+    # Build API request URL
+    url = f'https://api.etherscan.io/api?module=logs&action=getLogs&fromBlock=0&toBlock=latest&address=0x5e4861a80B55f035D899f66772117F00FA0E8e7B&topic0=0x24b74ee2302e778d8a63062bdcf86f073c12ec41dcd0a6d7b6ef03e61541da19&apikey={ETHERSCAN_API_KEY}'
+
+    # Send API request and parse response
+    response = requests.get(url)
+    response_dict = json.loads(response.text)
+
+    # Check for error in API response
+    if response_dict['message'] != 'OK':
+        raise ValueError(f'Error in API response: {response_dict["message"]}')
+
+    # Parse events and pass to handler function
+    events = response_dict['result']
+    for event in events:
+        handle_redemption_requested_event(event)
+
+    wallet_pub_key_hash = event['topics'][1].hex()[24:]  # remove "0x" prefix and first 24 zeros
+    redeemer = event['address']
+    requested_amount = int(event['data'], 16)
+    treasury_fee = int(event['topics'][2], 16)
+    tx_max_fee = int(event['topics'][3], 16)
+
+    # Create Discord embed with event information and Etherscan link
+    embed = discord.Embed(title='Redemption Requested Event', color=0xFF5733)
+    embed.add_field(name='Wallet Pub Key Hash', value=wallet_pub_key_hash, inline=False)
+    embed.add_field(name='Redeemer', value=f'<https://etherscan.io/address/{redeemer}>', inline=False)
+    embed.add_field(name='Requested Amount', value=requested_amount, inline=False)
+    embed.add_field(name='Treasury Fee', value=treasury_fee, inline=False)
+    embed.add_field(name='Tx Max Fee', value=tx_max_fee, inline=False)
+    embed.add_field(name='Etherscan Link',
+                    value=f'<https://etherscan.io/address/0x5e4861a80B55f035D899f66772117F00FA0E8e7B#events>',
+                    inline=False)
+
+
 @client.event
 async def on_ready():
     logger.info("{} connected to Discord!".format(client.user))
