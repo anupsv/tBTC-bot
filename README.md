@@ -1,7 +1,8 @@
 # tBTC DAO Monitoring Bot
 
 ### Description
-This convenient bot will monitor the tBTC DAO contract for new proposals that are submitted and will send alerts to any channel on a discord server that the bot is allowed to submit into. It contains links to the forum, details about the proposal, the deadline time for the proposal, links to the block, the transaction hash, proposal ID for people wanting on-chain details.
+This convenient bot will monitor the tBTC DAO contract and bridge contracts for new proposals that are submitted and will send alerts to any channel on a discord server that the bot is allowed to submit into. It contains links to the forum, details about the proposal, the deadline time for the proposal, links to the block, the transaction hash, proposal ID for people wanting on-chain details.
+It also monitors the Mint, RedemptionRequested events and sends alerts for the times Mints were done and the Wallets we're updated.
 
 ### How to Run the bot
 1. This is tested against 3.9.6
