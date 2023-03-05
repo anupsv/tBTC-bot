@@ -56,9 +56,10 @@ async def get_minted_event():
                 amount = int(amount, 16)
                 amount = amount / 10 ** 18  # convert to ETH
 
-                message = f"New Mint event! {amount} ETH sent to {'0x' + to_address[-40:]}"
+                embed = discord.Embed()
+                embed.description = f"New Mint event!\n{amount} ETH sent to {'0x' + to_address[-40:]}"
                 channel = client.get_channel(1079262552472682518)
-                await channel.send(message)
+                await channel.send(embed=embed)
     except Exception as e:
         print(f"Error: {e}")
 
